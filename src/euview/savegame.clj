@@ -1,35 +1,44 @@
 (ns euview.savegame
-  (:use [clojure.string :as string]))
+  (:use [clojure.string :as string]
+        [slingshot.slingshot :only (try+ throw+)]))
 
 (def fresh-int (atom 0))
 (def subline-parsers
   {:empty (fn [parse-state line]
-            (when (= "" line)
+            (when (re-matches #" *" line )
               parse-state))
    :eu4txt (fn [parse-state line]
              (when (= "EU4txt" line)
                parse-state))
    :newmap (fn [parse-state line]
-             (when-let [[_ n] (re-matches #" *(\w+)=[{]" line)]
+             (when-let [[_ n] (re-matches #" *([-.\w]+)=[{]" line)]
                (update parse-state :stack conj n)))
+   :empty-open (fn [parse-state line]
+                 (when (re-matches #" *[{] *" line)
+                   (update parse-state :stack conj "EMPTY")))
    :close (fn [parse-state line]
-            (when (re-matches #"\s*}" line)
+            (when (re-matches #" *} *" line)
               (if (seq (:stack parse-state))
-                (update parse-state :stack pop)
+                (if (= (:stack parse-state) ["provinces"])
+                  (throw+ {:type :all-done
+                           :parse-state parse-state})
+                  (update parse-state :stack pop))
                 (throw (ex-info "Got an unexpected }" {:line line})))))
    :keyval (fn [parse-state line]
-             (when-let [[_ k v] (re-matches #" *(\w+)=([^{]+)" line)]
+             (when-let [[_ k v] (re-matches #" *([-.\w]+)=([^{]+)" line)]
                (update-in parse-state (cons :variables (:stack parse-state))
                           assoc k v)))
    :key-weirdval (fn [parse-state line]
-             (when-let [[_ k v] (re-matches #" *(\w+)=[{]([^{}]*)}" line)]
-               (update-in parse-state (cons :variables (:stack parse-state))
-                          assoc k v)))
+                   (when-let [[_ k v] (re-matches #" *([-.\w]+)=[{]([^{}]*)}" line)]
+                     (update-in parse-state (cons :variables (:stack parse-state))
+                                assoc k v)))
    :dashes (fn [parse-state line]
-             (when (re-matches #" *-[- ]*")))
+             (when (re-matches #" *-[- ]*" line)
+               ;; feck off
+               parse-state))
    :numbers (fn [parse-state line]
               ;; whatever
-              (when (re-matches #" *[\d.]+( +[\d.]+)* *" line)
+              (when (re-matches #" *-?[\d.]+( +-?[\d.]+)* *" line)
                 parse-state))
    :string (fn [parse-state line]
              (when-let [[_ s] (re-matches #" *\"(.+)\"" line)]
@@ -72,7 +81,10 @@
             sublines)))
 
 (defn parse-lines [lines]
-  (reduce parse-line initial-parse-state lines))
+  (try+
+    (reduce parse-line initial-parse-state lines)
+    (catch [:type :all-done] {:keys [parse-state]}
+      parse-state)))
 
 (defn parse-savegame [stream]
   (let [lines (string/split-lines stream)
