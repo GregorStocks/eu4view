@@ -40,6 +40,8 @@
     (.setFont (Font. "SansSerif" Font/BOLD 14))
     (.drawString (str ymd) 50 50)))
 
+(defn latest-new-controller [province start-ymd end-ymd])
+
 (defn delta-frame [^BufferedImage map
                    provinces
                    start-ymd
@@ -50,7 +52,8 @@
       (.setColor ocean-color)
       (.fillRect 0 0 200 100))
     (write-year frame end-ymd)
-    (doseq [province provinces])
+    (doseq [province provinces]
+      (when-let [controller (latest-new-controller province start-ymd end-ymd)]))
     frame))
 
 (defn initial-frame [map provinces ymd]
@@ -77,17 +80,23 @@
 
 (defn construct-provinces [savegame map-bmp pid->color]
   (for [[k v] (-> savegame :variables (get "provinces"))]
-    {:pid k
-     :color (pid->color k)
-     :overlay nil
-     :history (get v "history")}))
+    (let [history (-> v (get "history"))]
+      {:pid k
+       :color (pid->color k)
+       :overlay nil
+       :initial-controller (get history "owner")
+       :controllers []
+       :history (get v "history")})))
 
 (defn date-string->ymd [date]
-  (let [[_ y m d] (re-matches #"(\d+)[.](\d+)[.](\d+)" date)]
-    (println date y m d)
-    [(Long/parseLong y)
-     (Long/parseLong m)
-     (Long/parseLong d)]))
+  (try
+    (let [[_ y m d] (re-matches #"(\d+)[.](\d+)[.](\d+)" date)]
+      (println date y m d)
+      [(Long/parseLong y)
+       (Long/parseLong m)
+       (Long/parseLong d)])
+    (catch Exception e
+      (throw (ex-info "Failed to parse date" {:date date})))))
 
 (defn make-frames [map savegame provinces start-ymd end-ymd]
   (if (= (first start-ymd) (first end-ymd))
@@ -109,6 +118,7 @@
 (defn render-gif [savegame gif-filename]
   (let [map (load-map)
         provinces (construct-provinces savegame map (load-provinces-csv))
+        _ (println (-> savegame :variables keys))
         start-ymd (-> savegame :variables (get "start_date") date-string->ymd)
         end-ymd (-> savegame :variables (get "date") date-string->ymd)
         frames (make-frames map savegame provinces start-ymd end-ymd)]

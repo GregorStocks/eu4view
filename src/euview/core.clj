@@ -17,11 +17,12 @@
     (zip-contents->eu4-file z)))
 
 (defn france []
-  (savegame/parse-savegame (resource->eu4-file (io/resource "France1449_01_25.eu4"))))
+  (let [filename "France1449_01_25.eu4"
+        savegame (savegame/parse-savegame (resource->eu4-file (io/resource filename)))]
+    savegame))
 
 (defn -main
-  "I don't do a whole lot ... yet."
   [& args]
   (let [f (france)]
-    (render/render-gif france "france.gif")
+    (render/render-gif f "france.gif")
     (println "Rendered france.gif")))

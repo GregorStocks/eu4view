@@ -2,6 +2,11 @@
   (:use [clojure.string :as string]
         [slingshot.slingshot :only (try+ throw+)]))
 
+(defn my-assoc [m k v]
+  (when (get m k)
+    (println "double inserting" m k))
+  (assoc m k v))
+
 (def fresh-int (atom 0))
 (def subline-parsers
   {:empty (fn [parse-state line]
