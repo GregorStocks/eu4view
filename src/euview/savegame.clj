@@ -2,11 +2,6 @@
   (:use [clojure.string :as string]
         [slingshot.slingshot :only (try+ throw+)]))
 
-(defn my-assoc [m k v]
-  (when (get m k)
-    (println "double inserting" m k))
-  (assoc m k v))
-
 (def fresh-int (atom 0))
 (def subline-parsers
   {:empty (fn [parse-state line]
@@ -91,7 +86,31 @@
     (catch [:type :all-done] {:keys [parse-state]}
       parse-state)))
 
+(defn date-string->ymd [date]
+  (try
+    (let [[_ y m d] (re-matches #"(\d+)[.](\d+)[.](\d+)" date)]
+      (println date y m d)
+      [(Long/parseLong y)
+       (Long/parseLong m)
+       (Long/parseLong d)])
+    (catch Exception e
+      (throw (ex-info "Failed to parse date" {:date date})))))
+
+(defn construct-provinces [savegame]
+  (for [[k v] (-> savegame :variables (get "provinces"))]
+    (let [history (-> v (get "history"))
+          owners (into {}
+                       (for [[k v] history]
+                         (if-let [tag (get v "owner")]
+                           [(date-string->ymd k) tag])))]
+      {:pid k
+       :initial-owner (get history "owner")
+       :owners owners
+       :history (get v "history")})))
+
 (defn parse-savegame [stream]
   (let [lines (string/split-lines stream)
         parsed-lines (parse-lines lines)]
-    parsed-lines))
+    {:start-ymd (-> parsed-lines :variables (get "start_date") date-string->ymd)
+     :end-ymd (-> parsed-lines :variables (get "date") date-string->ymd)
+     :provinces (construct-provinces parsed-lines)}))

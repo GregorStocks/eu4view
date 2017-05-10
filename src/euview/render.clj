@@ -40,7 +40,9 @@
     (.setFont (Font. "SansSerif" Font/BOLD 14))
     (.drawString (str ymd) 50 50)))
 
-(defn latest-new-controller [province start-ymd end-ymd])
+(defn latest-new-owner [province start-ymd end-ymd]
+  (let [owners (:owners province)]
+    ))
 
 (defn delta-frame [^BufferedImage map
                    provinces
@@ -53,7 +55,7 @@
       (.fillRect 0 0 200 100))
     (write-year frame end-ymd)
     (doseq [province provinces]
-      (when-let [controller (latest-new-controller province start-ymd end-ymd)]))
+      (when-let [owner (latest-new-owner province start-ymd end-ymd)]))
     frame))
 
 (defn initial-frame [map provinces ymd]
@@ -78,48 +80,27 @@
       (.addFrame encoder frame))
     (.finish encoder)))
 
-(defn construct-provinces [savegame map-bmp pid->color]
-  (for [[k v] (-> savegame :variables (get "provinces"))]
-    (let [history (-> v (get "history"))]
-      {:pid k
-       :color (pid->color k)
-       :overlay nil
-       :initial-controller (get history "owner")
-       :controllers []
-       :history (get v "history")})))
-
-(defn date-string->ymd [date]
-  (try
-    (let [[_ y m d] (re-matches #"(\d+)[.](\d+)[.](\d+)" date)]
-      (println date y m d)
-      [(Long/parseLong y)
-       (Long/parseLong m)
-       (Long/parseLong d)])
-    (catch Exception e
-      (throw (ex-info "Failed to parse date" {:date date})))))
-
-(defn make-frames [map savegame provinces start-ymd end-ymd]
+(defn make-frames [map provinces start-ymd end-ymd]
   (if (= (first start-ymd) (first end-ymd))
-    [(initial-frame map savegame provinces start-ymd)
-     (delta-frame map savegame provinces start-ymd end-ymd)]
+    [(initial-frame map provinces start-ymd)
+     (delta-frame map provinces start-ymd end-ymd)]
     (into []
           (concat
-           [(initial-frame map savegame provinces start-ymd)
+           [(initial-frame map provinces start-ymd)
             (delta-frame map
-                         savegame
                          provinces
                          start-ymd
                          [(inc (first start-ymd)) 1 1])]
            (for [year (range (inc (first start-ymd))
                              (first end-ymd))]
-             (delta-frame map savegame provinces [year 1 1] [(inc year) 1 1]))
-           [(delta-frame map savegame provinces [(first end-ymd) 1 1] end-ymd)]))))
+             (delta-frame map provinces [year 1 1] [(inc year) 1 1]))
+           [(delta-frame map provinces [(first end-ymd) 1 1] end-ymd)]))))
 
-(defn render-gif [savegame gif-filename]
+(defn apply-csv [provinces csv]
+  provinces)
+
+(defn render-gif [{:keys [provinces start-ymd end-ymd]} gif-filename]
   (let [map (load-map)
-        provinces (construct-provinces savegame map (load-provinces-csv))
-        _ (println (-> savegame :variables keys))
-        start-ymd (-> savegame :variables (get "start_date") date-string->ymd)
-        end-ymd (-> savegame :variables (get "date") date-string->ymd)
-        frames (make-frames map savegame provinces start-ymd end-ymd)]
+        provinces (apply-csv provinces (load-provinces-csv))
+        frames (make-frames map provinces start-ymd end-ymd)]
     (frames->gif frames gif-filename)))
