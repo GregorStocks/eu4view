@@ -2,8 +2,8 @@
   (:import [java.awt Image Color Font]
            java.awt.image.BufferedImage
            com.github.gif.AnimatedGifEncoder)
-  
-  (:require [clojure.java.io :as io]))
+  (:require [clojure.java.io :as io]
+            [mikera.image.core :as image]))
 
 (defn load-map []
   (let [scale-factor 4
@@ -22,46 +22,48 @@
     (slurp (io/resource "definition.csv"))
     {}))
 
-(defn province-owner-at [year]
-  "FRA")
-
-(def ocean-color Color/BLUE)
+(def ocean-color (Color. 60 120 250))
 (defn draw-oceans [frame]
   (doto (.createGraphics frame)
     (.setColor ocean-color)
     (.fillRect 0 0 (.getWidth frame) (.getHeight frame))))
 
-(def transparent-color (Color. 69 69 69 69))
+(def transparent-color (Color. 69 70 69 69))
 (defn draw-transparent [frame]
   (doto (.createGraphics frame)
     (.setColor transparent-color)
     (.fillRect 0 0 (.getWidth frame) (.getHeight frame))))
 
-(defn write-year [frame year]
+(defn write-year [frame ymd]
   (doto (.createGraphics frame)
-    (.setColor ocean-color)
-    (.fillRect 0 00 100 100)
     (.setColor Color/BLACK)
-    (.setFont (Font. "SansSerif" Font/BOLD 12))
-    (.drawString (str year) 50 50)))
+    (.setFont (Font. "SansSerif" Font/BOLD 14))
+    (.drawString (str ymd) 50 50)))
 
-(defn year->frame [savegame
-                   ^BufferedImage map
+(defn delta-frame [^BufferedImage map
                    provinces
-                   year]
+                   start-ymd
+                   end-ymd]
   (let [frame (BufferedImage. (.getWidth map) (.getHeight map) (.getType map))]
     (draw-transparent frame)
-    (println "constructing frame" year)
-    (write-year frame year)
+    (doto (.createGraphics frame)
+      (.setColor ocean-color)
+      (.fillRect 0 0 200 100))
+    (write-year frame end-ymd)
+    (doseq [province provinces])
     frame))
 
-(defn initial-frame [map savegame]
+(defn initial-frame [map provinces ymd]
   (let [frame (BufferedImage. (.getWidth map) (.getHeight map) (.getType map))]
     (draw-oceans frame)
-    (write-year frame "1444")
+    (write-year frame ymd)
+    ;; ????????????? REMOVING THIS BREAKS EVERYTHING
+    (doto (.createGraphics frame)
+      (.setColor (Color. 2 3 4))
+      (.fillRect 0 0 1 1))
     frame))
 
-(defn frames->gif [map frames gif-filename]
+(defn frames->gif [frames gif-filename]
   (let [encoder (AnimatedGifEncoder.)]
     (doto encoder 
       (.start gif-filename)
@@ -80,9 +82,34 @@
      :overlay nil
      :history (get v "history")}))
 
-(defn render-gif [parsed-savegame gif-filename]
+(defn date-string->ymd [date]
+  (let [[_ y m d] (re-matches #"(\d+)[.](\d+)[.](\d+)" date)]
+    (println date y m d)
+    [(Long/parseLong y)
+     (Long/parseLong m)
+     (Long/parseLong d)]))
+
+(defn make-frames [map savegame provinces start-ymd end-ymd]
+  (if (= (first start-ymd) (first end-ymd))
+    [(initial-frame map savegame provinces start-ymd)
+     (delta-frame map savegame provinces start-ymd end-ymd)]
+    (into []
+          (concat
+           [(initial-frame map savegame provinces start-ymd)
+            (delta-frame map
+                         savegame
+                         provinces
+                         start-ymd
+                         [(inc (first start-ymd)) 1 1])]
+           (for [year (range (inc (first start-ymd))
+                             (first end-ymd))]
+             (delta-frame map savegame provinces [year 1 1] [(inc year) 1 1]))
+           [(delta-frame map savegame provinces [(first end-ymd) 1 1] end-ymd)]))))
+
+(defn render-gif [savegame gif-filename]
   (let [map (load-map)
-        provinces (construct-provinces parsed-savegame map (load-provinces-csv))
-        frames (cons (initial-frame map parsed-savegame)
-                     (for [year (range 1444 1460)] (year->frame parsed-savegame map provinces year)))]
-    (frames->gif map frames gif-filename)))
+        provinces (construct-provinces savegame map (load-provinces-csv))
+        start-ymd (-> savegame :variables (get "start_date") date-string->ymd)
+        end-ymd (-> savegame :variables (get "date") date-string->ymd)
+        frames (make-frames map savegame provinces start-ymd end-ymd)]
+    (frames->gif frames gif-filename)))
