@@ -1,6 +1,7 @@
 (ns euview.savegame
-  (:use [clojure.string :as string]
-        [slingshot.slingshot :only (try+ throw+)]))
+  (:import [java.awt Color Font AlphaComposite]
+           java.awt.image.BufferedImage)
+  (:use [clojure.string :as string]))
 
 (def fresh-int (atom 0))
 (def subline-parsers
@@ -19,10 +20,7 @@
    :close (fn [parse-state line]
             (when (re-matches #" *} *" line)
               (if (seq (:stack parse-state))
-                (if (= (:stack parse-state) ["provinces"])
-                  (throw+ {:type :all-done
-                           :parse-state parse-state})
-                  (update parse-state :stack pop))
+                (update parse-state :stack pop)
                 (throw (ex-info "Got an unexpected }" {:line line})))))
    :keyval (fn [parse-state line]
              (when-let [[_ k v] (re-matches #" *([-.\w]+)=([^{]+)" line)]
@@ -37,9 +35,9 @@
                ;; feck off
                parse-state))
    :numbers (fn [parse-state line]
-              ;; whatever
               (when (re-matches #" *-?[\d.]+( +-?[\d.]+)* *" line)
-                parse-state))
+                (update-in parse-state (cons :variables (:stack parse-state))
+                           concat (map #(Long/parseLong %) (re-seq #"\d+" line)))))
    :string (fn [parse-state line]
              (when-let [[_ s] (re-matches #" *\"(.+)\"" line)]
                (update-in parse-state (cons :variables (:stack parse-state))
@@ -48,7 +46,7 @@
                                          (:stack parse-state)))
                           s)))
    :letters (fn [parse-state line]
-              (when-let [[_ s] (re-matches #" *(([a-zA-Z]+) *)+" line)]
+              (when-let [[_ s] (re-matches #" *([a-zA-Z][a-zA-Z ]+)" line)]
                 (update-in parse-state (cons :variables (:stack parse-state))
                            assoc
                            (count (get-in (:variables parse-state)
@@ -70,10 +68,10 @@
                                             :parsers (keys parsed)}))
       (seq parsed) (second (first parsed))
       :else (throw (ex-info "Couldn't parse subline" {:subline subline
-                                                      :parse-state (dissoc parse-state :variables)})))))
+                                                      :line-number (:line-number parse-state)})))))
 
 (defn parse-line [parse-state line]
-  (let [sublines (string/split line #"\t+")]
+  (let [sublines (string/split line #"(\t+)|(?<=[{])|(?=[}])")]
     (reduce parse-subline
             (-> parse-state
                 (assoc :current-line line)
@@ -81,20 +79,19 @@
             sublines)))
 
 (defn parse-lines [lines]
-  (try+
-    (reduce parse-line initial-parse-state lines)
-    (catch [:type :all-done] {:keys [parse-state]}
-      parse-state)))
+  (reduce parse-line initial-parse-state lines))
 
 (defn date-string->ymd [date]
   (try
     (let [[_ y m d] (re-matches #"(\d+)[.](\d+)[.](\d+)" date)]
-      (println date y m d)
       [(Long/parseLong y)
        (Long/parseLong m)
        (Long/parseLong d)])
     (catch Exception e
       (throw (ex-info "Failed to parse date" {:date date})))))
+
+(defn clean-string [s]
+  (string/replace s #"\"" ""))
 
 (defn construct-provinces [savegame]
   (for [[k v] (-> savegame :variables (get "provinces"))]
@@ -102,15 +99,22 @@
           owners (into {}
                        (for [[k v] history]
                          (if-let [tag (get v "owner")]
-                           [(date-string->ymd k) tag])))]
+                           [(date-string->ymd k) (clean-string tag)])))]
       {:pid k
-       :initial-owner (get history "owner")
+       :initial-owner (clean-string (get history "owner" ""))
        :owners owners
        :history (get v "history")})))
+
+(defn country-colors [savegame]
+  (into {}
+        (for [[k v] (-> savegame :variables (get "countries"))]
+          (let [[r g b] (get (get v "colors") "map_color")]
+            [k (Color. r g b)]))))
 
 (defn parse-savegame [stream]
   (let [lines (string/split-lines stream)
         parsed-lines (parse-lines lines)]
     {:start-ymd (-> parsed-lines :variables (get "start_date") date-string->ymd)
      :end-ymd (-> parsed-lines :variables (get "date") date-string->ymd)
-     :provinces (construct-provinces parsed-lines)}))
+     :provinces (construct-provinces parsed-lines)
+     :country-colors (country-colors parsed-lines)}))
