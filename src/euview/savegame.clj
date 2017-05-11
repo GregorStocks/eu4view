@@ -3,17 +3,21 @@
            java.awt.image.BufferedImage)
   (:use [clojure.string :as string]))
 
+(defn clean-string [s]
+  (string/replace s #"\"" ""))
+
 (def fresh-int (atom 0))
 (def subline-parsers
   {:empty (fn [parse-state line]
             (when (re-matches #" *" line )
               parse-state))
-   :eu4txt (fn [parse-state line]
-             (when (= "EU4txt" line)
-               parse-state))
    :newmap (fn [parse-state line]
              (when-let [[_ n] (re-matches #" *([-.\w]+)=[{]" line)]
-               (update parse-state :stack conj n)))
+               (let [f #(update-in % (cons :variables (:stack %))
+                                   (constantly nil))]
+                 (-> parse-state
+                     (update :stack conj n)
+                     f))))
    :empty-open (fn [parse-state line]
                  (when (re-matches #" *[{] *" line)
                    (update parse-state :stack conj "EMPTY")))
@@ -25,19 +29,18 @@
    :keyval (fn [parse-state line]
              (when-let [[_ k v] (re-matches #" *([-.\w]+)=([^{]+)" line)]
                (update-in parse-state (cons :variables (:stack parse-state))
-                          assoc k v)))
+                          assoc k (clean-string v))))
    :key-weirdval (fn [parse-state line]
                    (when-let [[_ k v] (re-matches #" *([-.\w]+)=[{]([^{}]*)}" line)]
                      (update-in parse-state (cons :variables (:stack parse-state))
-                                assoc k v)))
-   :dashes (fn [parse-state line]
-             (when (re-matches #" *-[- ]*" line)
-               ;; feck off
-               parse-state))
-   :numbers (fn [parse-state line]
-              (when (re-matches #" *-?[\d.]+( +-?[\d.]+)* *" line)
-                (update-in parse-state (cons :variables (:stack parse-state))
-                           concat (map #(Long/parseLong %) (re-seq #"\d+" line)))))
+                                assoc k (clean-string v))))
+   :scalars (fn [parse-state line]
+              (when (re-matches #" *[-.A-Za-z0-9]+( +[-.A-Za-z0-9]+)* *" line)
+                (if (= (:stack parse-state []))
+                  ;; eu4txt - metadata, not a scalar
+                  parse-state
+                  (update-in parse-state (cons :variables (:stack parse-state))
+                             concat (re-seq #"[^ ]+" line)))))
    :string (fn [parse-state line]
              (when-let [[_ s] (re-matches #" *\"(.+)\"" line)]
                (update-in parse-state (cons :variables (:stack parse-state))
@@ -46,12 +49,13 @@
                                          (:stack parse-state)))
                           s)))
    :letters (fn [parse-state line]
-              (when-let [[_ s] (re-matches #" *([a-zA-Z][a-zA-Z ]+)" line)]
-                (update-in parse-state (cons :variables (:stack parse-state))
-                           assoc
-                           (count (get-in (:variables parse-state)
-                                          (:stack parse-state)))
-                           s)))})
+              (when false
+                (when-let [[_ s] (re-matches #" *([a-zA-Z][a-zA-Z ]+)" line)]
+                  (update-in parse-state (cons :variables (:stack parse-state))
+                             assoc
+                             (count (get-in (:variables parse-state)
+                                            (:stack parse-state)))
+                             s))))})
 
 (def initial-parse-state
   {:stack []
@@ -71,6 +75,8 @@
                                                       :line-number (:line-number parse-state)})))))
 
 (defn parse-line [parse-state line]
+  (when (= 0 (mod (:line-number parse-state) 100000))
+    (println "processing line" (:line-number parse-state) "current stack" (:stack parse-state)))
   (let [sublines (string/split line #"(\t+)|(?<=[{])|(?=[}])")]
     (reduce parse-subline
             (-> parse-state
@@ -90,25 +96,24 @@
     (catch Exception e
       (throw (ex-info "Failed to parse date" {:date date})))))
 
-(defn clean-string [s]
-  (string/replace s #"\"" ""))
-
 (defn construct-provinces [savegame]
   (for [[k v] (-> savegame :variables (get "provinces"))]
     (let [history (-> v (get "history"))
           owners (into {}
                        (for [[k v] history]
                          (if-let [tag (get v "owner")]
-                           [(date-string->ymd k) (clean-string tag)])))]
-      {:pid k
-       :initial-owner (clean-string (get history "owner" ""))
+                           [(date-string->ymd k) tag])))]
+      {:pid (Long/parseLong k)
+       :initial-owner (get history "owner" "")
        :owners owners
        :history (get v "history")})))
 
 (defn country-colors [savegame]
   (into {}
         (for [[k v] (-> savegame :variables (get "countries"))]
-          (let [[r g b] (get (get v "colors") "map_color")]
+          (let [[r g b] (map #(Long/parseLong %)
+                             (get (get v "colors") "map_color"))]
+            (prn r g b (get (get v "colors") "map_color") (get v "colors"))
             [k (Color. r g b)]))))
 
 (defn parse-savegame [stream]
