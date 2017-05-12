@@ -13,11 +13,14 @@
                                       (if-let [[_ y m d] (re-matches #"-?(\d+)[.](\d+)[.](\d+)" match)]
                                         {:type :ymd
                                          :value (into [] (map #(Long/parseLong %) [y m d]))}
-                                        (try
+                                        (if (re-find #"[.]" match)
+                                          (try
+                                            {:type :number
+                                             :value (Float/parseFloat match)}
+                                            (catch Exception e
+                                              (throw (ex-info "Failed to parse float" {:float match}))))
                                           {:type :number
-                                           :value (Float/parseFloat match)}
-                                          (catch Exception e
-                                            (throw (ex-info "Failed to parse float" {:float match}))))))]
+                                           :value (Long/parseLong match)})))]
    :unquoted-string [#"^[a-zA-Z][a-zA-Z0-9_]*" (fn [match]
                                                  (cond
                                                    (= match "EU4txt") {:type :eutxt}
