@@ -188,7 +188,7 @@
 ;;            (println "Failed to find province on map" (:pid p) color)
             (assoc p :overlay nil :overlay-x 0 :overlay-y 0)))))))
 
-(def scale-factor 2)
+(def scale-factor 4)
 (defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} gif-filename]
   (let [map (load-map)
         provinces (add-overlays provinces map scale-factor)

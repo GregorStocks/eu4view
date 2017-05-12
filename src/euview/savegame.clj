@@ -102,7 +102,7 @@
                          (if-let [tag (get v "owner")]
                            [(date-string->ymd k) tag])))]
       {:pid (Long/parseLong k)
-       :initial-owner (get history "owner" "REB")
+       :initial-owner (get history "owner")
        :owners owners
        :history (get v "history")})))
 
