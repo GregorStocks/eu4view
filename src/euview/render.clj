@@ -7,7 +7,7 @@
             [mikera.image.core :as image]))
 
 (defn load-map []
-  (let [scale-factor 4
+  (let [scale-factor 1
         base-map (javax.imageio.ImageIO/read (io/resource "provinces.bmp"))
         w (int (/ (.getWidth base-map) scale-factor))
         h (int (/ (.getHeight base-map) scale-factor))
