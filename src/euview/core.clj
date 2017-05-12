@@ -24,5 +24,5 @@
 (defn -main
   [& args]
   (let [f (france)]
-    (render/render-gif f "france.gif")
+    (render/render-gif f "target/france.gif")
     (println "Rendered france.gif")))

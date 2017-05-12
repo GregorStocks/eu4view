@@ -7,16 +7,7 @@
             [mikera.image.core :as image]))
 
 (defn load-map []
-  (let [scale-factor 1
-        base-map (javax.imageio.ImageIO/read (io/resource "provinces.bmp"))
-        w (int (/ (.getWidth base-map) scale-factor))
-        h (int (/ (.getHeight base-map) scale-factor))
-        tmp (.getScaledInstance base-map w h Image/SCALE_SMOOTH)
-        dimg (BufferedImage. w h BufferedImage/TYPE_INT_ARGB)
-        g (.createGraphics dimg)]
-    (.drawImage g tmp 0 0 nil)
-    (.dispose g)
-    dimg))
+  (javax.imageio.ImageIO/read (io/resource "provinces.bmp")))
 
 (def ocean-color (Color. 60 120 250))
 (defn draw-oceans [frame]
@@ -25,7 +16,7 @@
     (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
     .dispose))
 
-(def transparent-color (Color. 69 69 69))
+(def transparent-color (Color. 0 0 0))
 (defn draw-transparent [frame]
   (doto (.createGraphics frame)
     (.setColor transparent-color)
@@ -34,7 +25,7 @@
 
 (defn write-year [frame ymd]
   (doto (.createGraphics frame)
-    (.setColor Color/BLACK)
+    (.setColor (Color. 1 1 1))
     (.setFont (Font. "SansSerif" Font/BOLD 14))
     (.drawString (str ymd) 50 50)
     .dispose))
@@ -60,6 +51,7 @@
     (let [owner-color (country-colors owner)
           g (.createGraphics o)
           fg (.createGraphics frame)]
+      (println "rendering" (:name province) "for" owner owner-color)
       (.setComposite g ac)
       (.setColor g owner-color)
       (.fillRect g 0 0 (.getWidth o) (.getHeight o))
@@ -67,12 +59,14 @@
       (.dispose fg)
       (.dispose g))))
 
-(defn add-initial-frame [{:keys [^BufferedImage map
+(defn add-initial-frame [{:keys [width
+                                 height
                                  encoder
                                  provinces
-                                 country-colors]}
+                                 country-colors] :as params}
                          ymd]
-  (let [frame (BufferedImage. (.getWidth map) (.getHeight map) (.getType map))]
+  (println (country-colors "FRA"))
+  (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
     (draw-oceans frame)
     (write-year frame ymd)
     (doseq [province provinces]
@@ -85,13 +79,15 @@
       .dispose)
     (.addFrame encoder frame)))
 
-(defn add-delta-frame [{:keys [^BufferedImage map
+(defn add-delta-frame [{:keys [width
+                               height
                                encoder
                                provinces
                                country-colors]}
                        start-ymd
                        end-ymd]
-  (let [frame (BufferedImage. (.getWidth map) (.getHeight map) (.getType map))]
+  (println "New frame::" end-ymd)
+  (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
     (draw-transparent frame)
     (doto (.createGraphics frame)
       (.setColor ocean-color)
@@ -101,7 +97,6 @@
     (doseq [province provinces]
       (when-let [owner (latest-new-owner province start-ymd end-ymd)]
         (render-owner province country-colors frame owner)))
-    (.setTransparent encoder transparent-color)
     (.addFrame encoder frame)))
 
 (defn base-gif [gif-filename]
@@ -112,7 +107,7 @@
     (.setTransparent transparent-color)
     (.start gif-filename)))
 
-(defn add-frames [{:keys [encoder map provinces colors] :as params} start-ymd end-ymd]
+(defn add-frames [{:keys [encoder provinces colors] :as params} start-ymd end-ymd]
   (add-initial-frame params start-ymd)
   (if (= (first start-ymd) (first end-ymd))
     (add-delta-frame params start-ymd end-ymd)
@@ -147,23 +142,27 @@
         (swap! bottoms update c da-max y)
         (swap! lefts update c da-min x)
         (swap! rights update c da-max x)))
+    (println (count @lefts))
     (juxt @lefts @rights @tops @bottoms)))
 
-(defn add-overlays [provinces map]
+(defn add-overlays [provinces map scale-factor]
   (let [loaded (slurp (io/resource "definition.csv"))
         lines (drop 1 (string/split-lines loaded))
-        colors (into {} (for [line lines]
-                          (let [[_ pid r g b] (re-matches #"(\d+);(\d+);(\d+);(\d+);.*" line)]
-                            [(- (Long/parseLong pid)) ;; lol
-                             (Color. (Long/parseLong r)
-                                     (Long/parseLong g)
-                                     (Long/parseLong b))])))
+       definitions (into {} (for [line lines]
+                             (let [[_ pid r g b name] (re-matches #"(\d+);(\d+);(\d+);(\d+);(.*)" line)]
+                               [(- (Long/parseLong pid)) ;; lol
+                                {:color (Color. (Long/parseLong r)
+                                                (Long/parseLong g)
+                                                (Long/parseLong b))
+                                 :name name}])))
         borders (colors->borders map)]
     (for [p (sort-by :pid provinces)]
-      (let [color (colors (:pid p))
+      (let [{:keys [color name]} (definitions (:pid p))
             [x1 x2 y1 y2] (borders color)]
         (if (and x1 (< (- x2 x1) 100) (< (- y2 y1) 100))
-          (let [frame (BufferedImage. (inc (- x2 x1)) (inc (- y2 y1)) BufferedImage/TYPE_INT_ARGB)]
+          (let [frame (BufferedImage. (int (/ (inc (- x2 x1)) scale-factor))
+                                      (int (/ (inc (- y2 y1)) scale-factor))
+                                      BufferedImage/TYPE_INT_ARGB)]
             (doto (.createGraphics frame)
               (.setColor (Color. 255 255 255 0))
               (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
@@ -173,19 +172,22 @@
               (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
               .dispose)
             (assoc p
+                   :name name
                    :overlay frame
-                   :overlay-x x1
-                   :overlay-y y1))
+                   :overlay-x (int (/ x1 scale-factor))
+                   :overlay-y (int (/ y1 scale-factor))))
           (do
-            (println "Failed to find province on map" (:pid p) color)
+;;            (println "Failed to find province on map" (:pid p) color)
             (assoc p :overlay nil :overlay-x 0 :overlay-y 0)))))))
 
+(def scale-factor 2)
 (defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} gif-filename]
   (let [map (load-map)
-        provinces (add-overlays provinces map)
+        provinces (add-overlays provinces map scale-factor)
         encoder (base-gif gif-filename)]
     (add-frames {:encoder encoder
-                 :map map
+                 :width (int (/ (.getWidth map) scale-factor))
+                 :height (int (/ (.getHeight map) scale-factor))
                  :provinces provinces
                  :country-colors country-colors}
                 start-ymd
