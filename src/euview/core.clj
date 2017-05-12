@@ -9,7 +9,7 @@
   (loop []
     (let [f (.getNextEntry c)]
       (if (= (.getName f) "game.eu4")
-        (slurp c)
+        c
         (recur)))))
 
 (defn resource->eu4-file [resource]

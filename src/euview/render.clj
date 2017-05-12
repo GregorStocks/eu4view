@@ -4,10 +4,11 @@
            com.github.gif.AnimatedGifEncoder)
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
+            [euview.parse :as parse]
             [mikera.image.core :as image]))
 
 (defn load-map []
-  (javax.imageio.ImageIO/read (io/resource "provinces.bmp")))
+  (javax.imageio.ImageIO/read (io/resource "Europa Universalis IV/map/provinces.bmp")))
 
 (def ocean-color (Color. 60 120 250))
 
@@ -142,7 +143,10 @@
     (juxt @lefts @rights @tops @bottoms)))
 
 (defn add-overlays [provinces map scale-factor]
-  (let [loaded (slurp (io/resource "definition.csv"))
+  (let [map-file (parse/parse-file (io/resource "Europa Universalis IV/map/default.map"))
+        ocean-provinces (set (get (:variables map-file) "sea_starts"))
+        _ (println "NEato" map-file ocean-provinces)
+        loaded (slurp (io/resource "Europa Universalis IV/map/definition.csv"))
         lines (drop 1 (string/split-lines loaded))
         definitions (into {} (for [line lines]
                                (let [[_ pid r g b name] (re-matches #"(\d+);(\d+);(\d+);(\d+);(.*)" line)]
