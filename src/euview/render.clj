@@ -75,19 +75,13 @@
     (println "Rendering oceans")
     (.addFrame encoder frame))
   (doseq [ps (map #(apply concat %)
-                  (partition-all 10 (vals (group-by :initial-owner provinces))))]
+                  (partition-all 250 (vals (group-by :initial-owner provinces))))]
     (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
       (draw-transparent frame)
       (write-year frame ymd)
       (doseq [province ps]
         (when-let [o (:initial-owner province)]
           (render-owner province country-colors frame o)))
-      ;; ????????????? REMOVING THIS BREAKS EVERYTHING
-      (println (set (map :initial-owner ps)))
-      (doto (.createGraphics frame)
-        (.setColor (Color. 2 3 4))
-        (.fillRect 0 0 1 1)
-        .dispose)
       (.addFrame encoder frame))))
 
 (defn add-delta-frames [{:keys [width
@@ -173,7 +167,7 @@
     (for [p (sort-by :pid provinces)]
       (let [{:keys [color name]} (definitions (:pid p))
             [x1 x2 y1 y2] (borders color)]
-        (if (and x1 (< (- x2 x1) 100) (< (- y2 y1) 100))
+        (if x1
           (let [frame (BufferedImage. (int (/ (inc (- x2 x1)) scale-factor))
                                       (int (/ (inc (- y2 y1)) scale-factor))
                                       BufferedImage/TYPE_INT_ARGB)]
