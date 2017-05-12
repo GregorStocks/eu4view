@@ -1,87 +1,53 @@
 (ns euview.parse
-  (:require [clojure.string :as string]))
+  (:require [clojure.string :as string]
+            [euview.lex :as lex]))
 
-(defn clean-string [s]
-  (string/replace s #"\"" ""))
+(def patterns
+  {:eutxt [[#{:eutxt}] (fn [[] state] state)]
+   :set-var [[#{:variable} #{:equals} #{:number :ymd :string :tag}]
+             (fn [[k _ v]
+                  {:keys [stack variables] :as state}]
+               (update-in state (cons :variables stack) assoc (:value k) v))]
+   :array-entry [[#{:number :ymd :string :tag}]
+             (fn [[k _ v]
+                  {:keys [stack variables] :as state}]
+               (update-in state (cons :variables stack) assoc (:value k) v))]
+   :set-map [[#{:variable} #{:equals} #{:open}]
+             (fn [[k _ _]
+                  state]
+               (update state :stack conj (:value k)))]
+   :close [[#{:close}]
+           (fn [[_] state]
+             (update state :stack pop))]})
 
-(def fresh-int (atom 0))
-(def subline-parsers
-  {:empty (fn [parse-state line]
-            (when (re-matches #" *" line )
-              parse-state))
-   :comment (fn [parse-state line]
-              (when (re-matches #" *#.*" line )
-                parse-state))
-   :newmap (fn [parse-state line]
-             (when-let [[_ n] (re-matches #" *([-.\w]+) *= *[{]" line)]
-               (-> parse-state
-                   (update :stack conj n)
-                   (update-in (cons :variables (:stack parse-state)) dissoc n))))
-   :empty-open (fn [parse-state line]
-                 (when (re-matches #" *[{] *" line)
-                   (update parse-state :stack conj "EMPTY")))
-   :close (fn [parse-state line]
-            (when (re-matches #" *} *" line)
-              (if (seq (:stack parse-state))
-                (update parse-state :stack pop)
-                (throw (ex-info "Got an unexpected }" {:line line})))))
-   :keyval (fn [parse-state line]
-             (when-let [[_ k v] (re-matches #" *([-.\w]+) *= *([^{]+)" line)]
-               (update-in parse-state (cons :variables (:stack parse-state))
-                          assoc k (clean-string v))))
-   :key-weirdval (fn [parse-state line]
-                   (when-let [[_ k v] (re-matches #" *([-.\w]+) *= *[{]([^{}]*)}" line)]
-                     (update-in parse-state (cons :variables (:stack parse-state))
-                                assoc k (clean-string v))))
-   :scalars (fn [parse-state line]
-              (when (re-matches #" *[-.A-Za-z0-9]+( +[-.A-Za-z0-9]+)* *" line)
-                (if (= (:stack parse-state) [])
-                  ;; eu4txt - metadata, not a scalar
-                  parse-state
-                  (update-in parse-state (cons :variables (:stack parse-state))
-                             concat (re-seq #"[^ ]+" line)))))
-   :string (fn [parse-state line]
-             (when-let [[_ s] (re-matches #" *\"(.+)\"" line)]
-               (update-in parse-state (cons :variables (:stack parse-state))
-                          assoc
-                          (count (get-in (:variables parse-state)
-                                         (:stack parse-state)))
-                          s)))
-   :letters (fn [parse-state line]
-              (when false
-                (when-let [[_ s] (re-matches #" *([a-zA-Z][a-zA-Z ]+)" line)]
-                  (update-in parse-state (cons :variables (:stack parse-state))
-                             assoc
-                             (count (get-in (:variables parse-state)
-                                            (:stack parse-state)))
-                             s))))})
-
-(def initial-parse-state
-  {:stack []
-   :line-number 1})
-(defn parse-subline [parse-state subline]
-  (let [parsed (into {} (map (fn [[k f]]
-                               (when-let [v (f parse-state subline)]
-                                 [k v]))
-                             subline-parsers))]
-    (cond
-      (> (count parsed) 1) (throw (ex-info "Multiple valid parses for subline"
-                                           {:line subline
-                                            :parse-state (dissoc parse-state :variables)
-                                            :parsers (keys parsed)}))
-      (seq parsed) (second (first parsed))
-      :else (throw (ex-info "Couldn't parse subline" {:subline subline
-                                                      :line-number (:line-number parse-state)})))))
-
-(defn parse-line [parse-state line]
-  (when (= 0 (mod (:line-number parse-state) 100000))
-    (println "processing line" (:line-number parse-state) "current stack" (:stack parse-state)))
-  (let [sublines (string/split line #"(\t+)|(?<=[{])|(?=[}])")]
-    (reduce parse-subline
-            (-> parse-state
-                (assoc :current-line line)
-                (update :line-number inc))
-            sublines)))
+(defn parse [original-tokens]
+  (println (take 10 original-tokens))
+  (loop [state {:variables {}
+                :stack []}
+         tokens (drop 1 original-tokens)]
+    (if-not (seq tokens)
+      (do
+        (when-not (= (:stack state) [])
+          (throw (ex-info "Exited without popping full stack???" {:stack (:stack state)})))
+        state)
+      (let [matches (keep (fn [[k [spec state-updater]]]
+                            (let [consumed (count spec)
+                                  agreements (map (fn [token valid-types] ((:type token) valid-types))
+                                                  tokens
+                                                  spec)]
+                              (when (and (= (count agreements) consumed)
+                                         (every? identity agreements))
+                                {:consumed consumed
+                                 :state-updater (partial state-updater (take consumed tokens))})))
+                          patterns)]
+        (cond
+          (> (count matches) 1) (throw (ex-info "Multiple valid parses" {:parses matches}))
+          (= (count matches) 1) (recur ((:state-updater (first matches)) state)
+                                       (drop (:consumed (first matches)) tokens))
+          (empty? matches) (throw (ex-info "Unable to parse at" {:tokens (take 10 tokens)})))))))
 
 (defn parse-file [f]
-  (reduce parse-line initial-parse-state (string/split-lines (slurp f))))
+  (-> f
+      slurp
+      lex/lex
+      parse))
