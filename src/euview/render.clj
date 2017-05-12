@@ -16,7 +16,7 @@
     (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
     .dispose))
 
-(def transparent-color (Color. 0 0 0))
+(def transparent-color (Color. 0x69 0x69 0x69))
 (defn draw-transparent [frame]
   (doto (.createGraphics frame)
     (.setColor transparent-color)
@@ -67,24 +67,27 @@
   (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
     (draw-oceans frame)
     (write-year frame ymd)
-    ;; ????????????? REMOVING THIS BREAKS EVERYTHING    
     (doto (.createGraphics frame)
       (.setColor (Color. 2 3 4))
       (.fillRect 0 0 1 1)
       .dispose)
+    (println "Rendering oceans")
     (.addFrame encoder frame))
-  (for [ps (partition-all 250 (filter :initial-owner provinces))]
+  (doseq [ps (map #(apply concat %)
+                  (partition-all 250 (vals (group-by :initial-owner provinces))))]
     (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
       (draw-transparent frame)
       (write-year frame ymd)
       (doseq [province ps]
-        (let [o (:initial-owner province)]
+        (when-let [o (:initial-owner province)]
           (render-owner province country-colors frame o)))
       ;; ????????????? REMOVING THIS BREAKS EVERYTHING    
       (doto (.createGraphics frame)
         (.setColor (Color. 2 3 4))
         (.fillRect 0 0 1 1)
         .dispose)
+      (println "Rendering initial-frame" (map #(String/format "0x%06X" (.getRGB (country-colors %)))
+                                              (set (map :initial-owners ps))))
       (.addFrame encoder frame))))
 
 (defn add-delta-frames [{:keys [width
@@ -94,13 +97,13 @@
                                 country-colors]}
                         start-ymd
                         end-ymd]
-  (println "New frame:" end-ymd)
   (let [updates (keep (fn [province]
                         (when-let [owner (latest-new-owner province start-ymd end-ymd)]
                           [province owner]))
                       provinces)]
-    (println "Updates" (map (fn [[p o]] [(:name p) o]) updates))
-    (for [province-owners (partition-all 250 updates)]
+    (doseq [province-owners (map #(apply concat %)
+                                 (partition-all 250 (vals (group-by second updates))))]
+      (println "Doing province-owners" province-owners)
       (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
         (draw-transparent frame)
         (doto (.createGraphics frame)
@@ -110,6 +113,7 @@
         (write-year frame end-ymd)
         (doseq [[province owner] province-owners]
           (render-owner province country-colors frame owner))
+        (println "Rendering delta-frame" end-ymd (set (map second province-owners)))
         (.addFrame encoder frame)))))
 
 (defn base-gif [gif-filename]
@@ -155,7 +159,6 @@
         (swap! bottoms update c da-max y)
         (swap! lefts update c da-min x)
         (swap! rights update c da-max x)))
-    (println (count @lefts))
     (juxt @lefts @rights @tops @bottoms)))
 
 (defn add-overlays [provinces map scale-factor]
