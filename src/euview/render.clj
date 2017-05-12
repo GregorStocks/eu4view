@@ -51,12 +51,13 @@
     (let [owner-color (country-colors owner)
           g (.createGraphics o)
           fg (.createGraphics frame)]
-      ;;(.setComposite g ac)
-      (.setColor g owner-color)
-      (.fillRect g 0 0 (.getWidth o) (.getHeight o))
-      (.drawImage fg o (:overlay-x province) (:overlay-y province) nil)
-      (.dispose fg)
-      (.dispose g))))
+      (when (not= owner-color Color/WHITE)
+        ;;      (.setComposite g ac)
+        (.setColor g owner-color)
+        (.fill g (java.awt.geom.Rectangle2D$Double. 0 0 (.getWidth o) (.getHeight o)))
+        (.dispose g)
+        (.drawImage fg o (:overlay-x province) (:overlay-y province) nil)
+        (.dispose fg)))))
 
 (defn add-initial-frames [{:keys [width
                                   height
@@ -74,14 +75,15 @@
     (println "Rendering oceans")
     (.addFrame encoder frame))
   (doseq [ps (map #(apply concat %)
-                  (partition-all 250 (vals (group-by :initial-owner provinces))))]
+                  (partition-all 10 (vals (group-by :initial-owner provinces))))]
     (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
       (draw-transparent frame)
       (write-year frame ymd)
       (doseq [province ps]
         (when-let [o (:initial-owner province)]
           (render-owner province country-colors frame o)))
-      ;; ????????????? REMOVING THIS BREAKS EVERYTHING    
+      ;; ????????????? REMOVING THIS BREAKS EVERYTHING
+      (println (set (map :initial-owner ps)))
       (doto (.createGraphics frame)
         (.setColor (Color. 2 3 4))
         (.fillRect 0 0 1 1)
@@ -180,7 +182,7 @@
               (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
               .dispose)
             (doto (.createGraphics frame)
-              (.setColor color)
+              (.setColor (Color. 0 0 0))
               (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
               .dispose)
             (assoc p
