@@ -17,7 +17,7 @@
     (zip-contents->eu4-file z)))
 
 (defn france []
-  (let [filename "France1562_03_14.eu4"
+  (let [filename "France1739_06_08.eu4"
         savegame (savegame/parse-savegame (resource->eu4-file (io/resource filename)))]
     savegame))
 

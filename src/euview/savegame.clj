@@ -13,11 +13,9 @@
               parse-state))
    :newmap (fn [parse-state line]
              (when-let [[_ n] (re-matches #" *([-.\w]+)=[{]" line)]
-               (let [f #(update-in % (cons :variables (:stack %))
-                                   (constantly nil))]
-                 (-> parse-state
-                     (update :stack conj n)
-                     f))))
+               (-> parse-state
+                   (update :stack conj n)
+                   (update-in (cons :variables (:stack parse-state)) dissoc n))))
    :empty-open (fn [parse-state line]
                  (when (re-matches #" *[{] *" line)
                    (update parse-state :stack conj "EMPTY")))
@@ -36,7 +34,7 @@
                                 assoc k (clean-string v))))
    :scalars (fn [parse-state line]
               (when (re-matches #" *[-.A-Za-z0-9]+( +[-.A-Za-z0-9]+)* *" line)
-                (if (= (:stack parse-state []))
+                (if (= (:stack parse-state) [])
                   ;; eu4txt - metadata, not a scalar
                   parse-state
                   (update-in parse-state (cons :variables (:stack parse-state))
@@ -113,7 +111,6 @@
         (for [[k v] (-> savegame :variables (get "countries"))]
           (let [[r g b] (map #(Long/parseLong %)
                              (get (get v "colors") "map_color"))]
-            (prn r g b (get (get v "colors") "map_color") (get v "colors"))
             [k (Color. r g b)]))))
 
 (defn parse-savegame [stream]

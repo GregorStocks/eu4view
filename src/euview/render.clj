@@ -25,7 +25,7 @@
     (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
     .dispose))
 
-(def transparent-color (Color. 69 70 69 69))
+(def transparent-color (Color. 69 69 69))
 (defn draw-transparent [frame]
   (doto (.createGraphics frame)
     (.setColor transparent-color)
@@ -83,8 +83,7 @@
       (.setColor (Color. 2 3 4))
       (.fillRect 0 0 1 1)
       .dispose)
-    (.addFrame encoder frame))
-  (println "Rendered initial frame"))
+    (.addFrame encoder frame)))
 
 (defn add-delta-frame [{:keys [^BufferedImage map
                                encoder
@@ -102,16 +101,16 @@
     (doseq [province provinces]
       (when-let [owner (latest-new-owner province start-ymd end-ymd)]
         (render-owner province country-colors frame owner)))
-    (.addFrame encoder frame))
-  (println "Rendered frame for" end-ymd))
+    (.setTransparent encoder transparent-color)
+    (.addFrame encoder frame)))
 
 (defn base-gif [gif-filename]
   (doto (AnimatedGifEncoder.)
-    (.start gif-filename)
     (.setDelay 10)
     (.setRepeat 0)
     (.setDispose 1)
-    (.setTransparent transparent-color)))
+    (.setTransparent transparent-color)
+    (.start gif-filename)))
 
 (defn add-frames [{:keys [encoder map provinces colors] :as params} start-ymd end-ymd]
   (add-initial-frame params start-ymd)
@@ -119,7 +118,7 @@
     (add-delta-frame params start-ymd end-ymd)
     (do
       (add-delta-frame params start-ymd [(inc (first start-ymd)) 1 1])
-      (doseq [year (range (inc (first start-ymd)) (first end-ymd))]     
+      (doseq [year (range (inc (first start-ymd)) (first end-ymd))]
         (add-delta-frame params [year 1 1] [(inc year) 1 1]))
       (add-delta-frame params [(first end-ymd) 1 1] end-ymd))))
 
@@ -144,13 +143,10 @@
             g (bit-shift-right (bit-and 0xff00 rgb) 8)
             b (bit-and 0xff rgb)
             c (Color. r g b)]
-        (when (= x y 0)
-          (prn rgb r g b c))
         (swap! tops update c da-min y)
         (swap! bottoms update c da-max y)
         (swap! lefts update c da-min x)
         (swap! rights update c da-max x)))
-    (prn (count @lefts))
     (juxt @lefts @rights @tops @bottoms)))
 
 (defn add-overlays [provinces map]
@@ -158,15 +154,15 @@
         lines (drop 1 (string/split-lines loaded))
         colors (into {} (for [line lines]
                           (let [[_ pid r g b] (re-matches #"(\d+);(\d+);(\d+);(\d+);.*" line)]
-                            [(str "-" pid) ;; lol
+                            [(- (Long/parseLong pid)) ;; lol
                              (Color. (Long/parseLong r)
                                      (Long/parseLong g)
                                      (Long/parseLong b))])))
         borders (colors->borders map)]
-    (for [p provinces]
+    (for [p (sort-by :pid provinces)]
       (let [color (colors (:pid p))
             [x1 x2 y1 y2] (borders color)]
-        (if x1
+        (if (and x1 (< (- x2 x1) 100) (< (- y2 y1) 100))
           (let [frame (BufferedImage. (inc (- x2 x1)) (inc (- y2 y1)) BufferedImage/TYPE_INT_ARGB)]
             (doto (.createGraphics frame)
               (.setColor (Color. 255 255 255 0))
@@ -181,7 +177,7 @@
                    :overlay-x x1
                    :overlay-y y1))
           (do
-            (println "Failed to find province on map" (:pid p))
+            (println "Failed to find province on map" (:pid p) color)
             (assoc p :overlay nil :overlay-x 0 :overlay-y 0)))))))
 
 (defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} gif-filename]
