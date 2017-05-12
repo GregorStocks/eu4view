@@ -4,14 +4,15 @@
   {:whitespace [#"^\s+" :ignore]
    ;;   :eu4txt [#"^EU4txt" (fn [match] {:type :eu4txt})]
    :comment [#"^#.+" :ignore]
-   :empty-tag [#"^---" (fn [match] {:type :empty-tag})]
+   :empty-tag [#"^---" (fn [match] {:type :tag
+                                    :value "---"})]
    :equals [#"^=" (fn [match] {:type :equals})]
    :open [#"^[{]" (fn [match] {:type :open})]
    :close [#"^[}]" (fn [match] {:type :close})]
    :number-or-date [#"^[-]?[0-9.]+" (fn [match]
-                                      (if-let [[_ y m d] (re-matches #"-?(\d+).(\d+).(\d+)" match)]
+                                      (if-let [[_ y m d] (re-matches #"-?(\d+)[.](\d+)[.](\d+)" match)]
                                         {:type :ymd
-                                         :value [y m d]}
+                                         :value (into [] (map #(Long/parseLong %) [y m d]))}
                                         (try
                                           {:type :number
                                            :value (Float/parseFloat match)}

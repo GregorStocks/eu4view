@@ -34,9 +34,9 @@
 (defn latest-new-owner [province start-ymd end-ymd]
   (->> province
        :owners
-       (filter #(and
-                 (ymd-< start-ymd (first %))
-                 (ymd-<= (first %) end-ymd)))
+       (filter #(let [x (first %)]
+                  (and (ymd-< start-ymd x)
+                       (ymd-<= x end-ymd))))
        (sort-by first)
        last
        second))
@@ -85,6 +85,7 @@
                       provinces)]
     (doseq [province-owners (map #(apply concat %)
                                  (partition-all 250 (vals (group-by second updates))))]
+      (println "Frame for" end-ymd)
       (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
         (draw-transparent frame)
         (doto (.createGraphics frame)
@@ -144,8 +145,7 @@
 
 (defn add-overlays [provinces map scale-factor]
   (let [map-file (parse/parse-file (io/resource "Europa Universalis IV/map/default.map"))
-        ocean-provinces (set (get (:variables map-file) "sea_starts"))
-        _ (println "NEato" map-file ocean-provinces)
+        ocean-provinces (set (map #(- (Long/parseLong %)) (get (:variables map-file) "sea_starts")))
         loaded (slurp (io/resource "Europa Universalis IV/map/definition.csv"))
         lines (drop 1 (string/split-lines loaded))
         definitions (into {} (for [line lines]
