@@ -309,7 +309,6 @@ public class AnimatedGifEncoder {
     usedEntry[0] = true;
     colorIndexes.put(0x696969, (byte)0);
     int currentOffset = 1;
-    System.out.println("TOP LEFT RGB" + pixels[0] + " " + pixels[1] + " " + pixels[2]);
     for (int i = 0; i < nPix; i++) {
 	byte b = pixels[k++];
 	byte g = pixels[k++];
@@ -322,7 +321,6 @@ public class AnimatedGifEncoder {
 	    if (currentOffset >= 256) {
 		throw new RuntimeException("Too many colors in frame!!!");
 	    }
-	    System.out.println("Adding color " + rgb + " " + String.format("0x%06X", rgb));
 	    int x = currentOffset * 3;
 	    colorTab[x++] = r;
 	    colorTab[x++] = g;

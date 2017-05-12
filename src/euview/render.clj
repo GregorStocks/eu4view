@@ -51,7 +51,7 @@
     (let [owner-color (country-colors owner)
           g (.createGraphics o)
           fg (.createGraphics frame)]
-      (.setComposite g ac)
+      ;;(.setComposite g ac)
       (.setColor g owner-color)
       (.fillRect g 0 0 (.getWidth o) (.getHeight o))
       (.drawImage fg o (:overlay-x province) (:overlay-y province) nil)
@@ -86,8 +86,6 @@
         (.setColor (Color. 2 3 4))
         (.fillRect 0 0 1 1)
         .dispose)
-      (println "Rendering initial-frame" (map #(String/format "0x%06X" (.getRGB (country-colors %)))
-                                              (set (map :initial-owners ps))))
       (.addFrame encoder frame))))
 
 (defn add-delta-frames [{:keys [width
@@ -103,7 +101,6 @@
                       provinces)]
     (doseq [province-owners (map #(apply concat %)
                                  (partition-all 250 (vals (group-by second updates))))]
-      (println "Doing province-owners" province-owners)
       (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
         (draw-transparent frame)
         (doto (.createGraphics frame)
@@ -113,7 +110,6 @@
         (write-year frame end-ymd)
         (doseq [[province owner] province-owners]
           (render-owner province country-colors frame owner))
-        (println "Rendering delta-frame" end-ymd (set (map second province-owners)))
         (.addFrame encoder frame)))))
 
 (defn base-gif [gif-filename]
