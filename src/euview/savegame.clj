@@ -2,22 +2,26 @@
   (:import [java.awt Color Font]
            java.awt.image.BufferedImage)
   (:require [clojure.string :as string]
-             [euview.parse :as parse]))
+            [clojure.java.io :as io]
+            [euview.parse :as parse]))
 
 (defn construct-provinces [savegame]
-  (for [[k v] (-> savegame :variables (get "provinces"))]
-    (let [history (-> v (get "history"))
-          owners (into {}
-                       (for [[k v] history]
-                         (if-let [tag (get v "owner")]
-                           [k tag])))
-          default-owner (cond
-                          (get v "capital") :empty
-                          (get v "patrol") :ocean
-                          :else :wasteland)]
-      {:pid k
-       :initial-owner (get history "owner" default-owner)
-       :owners owners})))
+  (let [map-file (parse/parse-file (io/resource "Europa Universalis IV/map/default.map"))
+        ocean-provinces (set (map - (get (:variables map-file) "sea_starts")))]
+    (println ocean-provinces)
+    (for [[k v] (-> savegame :variables (get "provinces"))]
+      (let [history (-> v (get "history"))
+            owners (into {}
+                         (for [[k v] history]
+                           (if-let [tag (get v "owner")]
+                             [k tag])))
+            default-owner (cond
+                            (ocean-provinces k) :ocean
+                            (get v "capital") :empty
+                            :else :wasteland)]
+        {:pid k
+         :initial-owner (get history "owner" default-owner)
+         :owners owners}))))
 
 (defn country-colors [savegame]
   (into {:empty (Color. 50 50 20)
