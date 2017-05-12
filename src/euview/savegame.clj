@@ -17,8 +17,7 @@
                           :else :wasteland)]
       {:pid k
        :initial-owner (get history "owner" default-owner)
-       :owners owners
-       :history (get v "history")})))
+       :owners owners})))
 
 (defn country-colors [savegame]
   (into {:empty (Color. 50 50 20)
