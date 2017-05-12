@@ -100,9 +100,10 @@
           owners (into {}
                        (for [[k v] history]
                          (if-let [tag (get v "owner")]
-                           [(date-string->ymd k) tag])))]
+                           [(date-string->ymd k) tag])))
+          default-owner (when (= "yes" (get v "is_city")) "REB")]
       {:pid (Long/parseLong k)
-       :initial-owner (get history "owner")
+       :initial-owner (get history "owner" default-owner)
        :owners owners
        :history (get v "history")})))
 

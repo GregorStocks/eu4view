@@ -163,7 +163,7 @@
                                                   (Long/parseLong g)
                                                   (Long/parseLong b))
                                    :name name}])))
-        borders (colors->borders map)]
+        borders (colors->borders map scale-factor)]
     (for [p (sort-by :pid provinces)]
       (let [{:keys [color name]} (definitions (:pid p))
             [x1 x2 y1 y2] (borders color)]
@@ -192,7 +192,7 @@
 (def scale-factor 2)
 (defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} gif-filename]
   (let [map (load-map)
-        provinces (add-overlays provinces map scale-factor)
+        provinces (doall (add-overlays provinces map scale-factor))
         encoder (base-gif gif-filename)]
     (println "Rendering gif")
     (add-frames {:encoder encoder
