@@ -202,5 +202,5 @@
                  :country-colors country-colors}
                 start-ymd
                 end-ymd)
-    (.setDelay encoder 200)
+    (.setDelay encoder 200) ;; todo make this work properly
     (.finish encoder)))
