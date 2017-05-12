@@ -101,15 +101,19 @@
                        (for [[k v] history]
                          (if-let [tag (get v "owner")]
                            [(date-string->ymd k) tag])))
-          default-owner (when (get v "capital")
-                          "REB")]
+          default-owner (cond
+                          (get v "capital") :empty
+                          (get v "patrol") :ocean
+                          :else :wasteland)]
       {:pid (Long/parseLong k)
        :initial-owner (get history "owner" default-owner)
        :owners owners
        :history (get v "history")})))
 
 (defn country-colors [savegame]
-  (into {}
+  (into {:empty (Color. 50 50 20)
+         :ocean (Color. 60 120 250)
+         :wasteland (Color. 70 70 70)}
         (for [[k v] (-> savegame :variables (get "countries"))]
           (let [[r g b] (map #(Long/parseLong %)
                              (get (get v "colors") "map_color"))]

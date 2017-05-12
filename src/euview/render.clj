@@ -10,11 +10,6 @@
   (javax.imageio.ImageIO/read (io/resource "provinces.bmp")))
 
 (def ocean-color (Color. 60 120 250))
-(defn draw-oceans [frame]
-  (doto (.createGraphics frame)
-    (.setColor ocean-color)
-    (.fillRect 0 0 (.getWidth frame) (.getHeight frame))
-    .dispose))
 
 (def transparent-color (Color. 0x69 0x69 0x69))
 (defn draw-transparent [frame]
@@ -66,16 +61,8 @@
                                   country-colors] :as params}
                           ymd]
   (let [province-groups (map #(apply concat %)
-                             (partition-all 250 (vals (group-by :initial-owner provinces))))
-        first-frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
-    (draw-oceans first-frame)
-    (write-year first-frame ymd)
-    (doseq [province (first province-groups)]
-      (when-let [o (:initial-owner province)]
-        (render-owner province country-colors first-frame o)))
-    (.addFrame encoder first-frame)
-    ;; likely need >1 frame
-    (doseq [ps (rest province-groups)]
+                             (partition-all 250 (vals (group-by :initial-owner provinces))))]
+    (doseq [ps province-groups]
       (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
         (draw-transparent frame)
         (write-year frame ymd)
@@ -124,6 +111,7 @@
       (add-delta-frames params start-ymd [(inc (first start-ymd)) 1 1])
       (doseq [year (range (inc (first start-ymd)) (first end-ymd))]
         (add-delta-frames params [year 1 1] [(inc year) 1 1]))
+      (.setDelay encoder 20000) ;; todo make this work properly
       (add-delta-frames params [(first end-ymd) 1 1] end-ymd))))
 
 (defn da-min [x y]
@@ -202,5 +190,4 @@
                  :country-colors country-colors}
                 start-ymd
                 end-ymd)
-    (.setDelay encoder 200) ;; todo make this work properly
     (.finish encoder)))
