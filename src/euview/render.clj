@@ -144,9 +144,7 @@
     (juxt @lefts @rights @tops @bottoms)))
 
 (defn add-overlays [provinces map scale-factor]
-  (let [map-file (parse/parse-file (io/resource "Europa Universalis IV/map/default.map"))
-        ocean-provinces (set (get (:variables map-file) "sea_starts"))
-        loaded (slurp (io/resource "Europa Universalis IV/map/definition.csv"))
+  (let [loaded (slurp (io/resource "Europa Universalis IV/map/definition.csv"))
         lines (drop 1 (string/split-lines loaded))
         definitions (into {} (for [line lines]
                                (let [[_ pid r g b name] (re-matches #"(\d+);(\d+);(\d+);(\d+);(.*)" line)]

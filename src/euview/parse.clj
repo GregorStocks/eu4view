@@ -18,7 +18,7 @@
                       {:keys [stack variables] :as state}]
                    (when (map? (get-in state (cons :variables stack)))
                      (throw (ex-info "Trying to mix array & map around" stack)))
-                   (update-in state (cons :variables stack) conj (:value v)))]
+                   (update-in state (cons :variables stack) concat [(:value v)]))]
    :set-map [[scalar #{:equals} #{:open}]
              []
              (fn [[k _ _]
