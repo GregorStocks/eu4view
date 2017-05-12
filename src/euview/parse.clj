@@ -2,6 +2,11 @@
   (:require [clojure.string :as string]
             [euview.lex :as lex]))
 
+(defn ensure-not-array [m k]
+  (if (map? (get m k))
+    m
+    (dissoc m k)))
+
 (def scalar #{:variable :tag :number :ymd :string})
 (def patterns
   {:eutxt [[#{:eutxt}]
@@ -26,7 +31,7 @@
                (-> state
                    (update :stack conj (:value k))
                    ;; sometimes the same value is reused for a scalar and a bit of hierarchy...
-                   (update-in (cons :variables (:stack state)) dissoc (:value k))))]
+                   (update-in (cons :variables (:stack state)) ensure-not-array (:value k))))]
    :open-by-itself-dammit-paradox [[#{:open}]
                                    []
                                    (fn [[_]
