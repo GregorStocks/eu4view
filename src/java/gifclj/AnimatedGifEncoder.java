@@ -3,6 +3,7 @@ package com.github.gif;
 import java.io.*;
 import java.awt.*;
 import java.awt.image.*;
+import java.util.Hashtable;
 
 /**
  * Class java.com.github.gif.java.com.github.gif.AnimatedGifEncoder - Encodes a GIF file consisting of one or more
@@ -135,12 +136,10 @@ public class AnimatedGifEncoder {
    *          BufferedImage containing frame to write.
    * @return true if successful.
    */
-  public boolean addFrame(BufferedImage im) {
+  public void addFrame(BufferedImage im) {
     if ((im == null) || !started) {
-      return false;
+	return;
     }
-    boolean ok = true;
-    try {
       if (!sizeSet) {
 	// use first frame's size
 	setSize(im.getWidth(), im.getHeight());
@@ -163,11 +162,6 @@ public class AnimatedGifEncoder {
       }
       writePixels(); // encode and write pixel data
       firstFrame = false;
-    } catch (IOException e) {
-      ok = false;
-    }
-
-    return ok;
   }
 
   /**
@@ -298,25 +292,40 @@ public class AnimatedGifEncoder {
    * Analyzes image colors and creates color map.
    */
   protected void analyzePixels() {
+    System.out.println("What?????");
     int len = pixels.length;
     int nPix = len / 3;
     indexedPixels = new byte[nPix];
-    NeuQuant nq = new NeuQuant(pixels, len, sample);
-    // initialize quantizer
-    colorTab = nq.process(); // create reduced palette
-    // convert map from BGR to RGB
-    for (int i = 0; i < colorTab.length; i += 3) {
-      byte temp = colorTab[i];
-      colorTab[i] = colorTab[i + 2];
-      colorTab[i + 2] = temp;
-      usedEntry[i / 3] = false;
+    Hashtable<Integer, Byte> colorIndexes = new Hashtable<Integer, Byte>();
+    colorTab = new byte[3 * 256];
+
+    for (int i = 0; i < 256; i++) {
+      usedEntry[i] = false;
     }
     // map image pixels to new palette
     int k = 0;
+    int currentOffset = 0;
     for (int i = 0; i < nPix; i++) {
-      int index = nq.map(pixels[k++] & 0xff, pixels[k++] & 0xff, pixels[k++] & 0xff);
-      usedEntry[index] = true;
-      indexedPixels[i] = (byte) index;
+	byte r = pixels[k++];
+	byte g = pixels[k++];
+	byte b = pixels[k++];
+	int rgb = (r << 16) | (g << 8) | b;
+	Byte index = colorIndexes.get(rgb);
+	if (index != null) {
+	    indexedPixels[i] = index;
+	} else {
+	    if (currentOffset >= 256) {
+		throw new RuntimeException("Too many colors in frame!!!");
+	    }
+	    System.out.println("Adding color" + rgb);
+	    int x = currentOffset * 3;
+	    colorTab[x++] = r;
+	    colorTab[x++] = g;
+	    colorTab[x++] = b;
+	    indexedPixels[i] = (byte)currentOffset;
+	    colorIndexes.put(rgb, (byte)currentOffset);
+	    currentOffset++;
+	}
     }
     pixels = null;
     colorDepth = 8;

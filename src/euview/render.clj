@@ -51,7 +51,6 @@
     (let [owner-color (country-colors owner)
           g (.createGraphics o)
           fg (.createGraphics frame)]
-      (println "rendering" (:name province) "for" owner owner-color)
       (.setComposite g ac)
       (.setColor g owner-color)
       (.fillRect g 0 0 (.getWidth o) (.getHeight o))
@@ -59,45 +58,59 @@
       (.dispose fg)
       (.dispose g))))
 
-(defn add-initial-frame [{:keys [width
-                                 height
-                                 encoder
-                                 provinces
-                                 country-colors] :as params}
-                         ymd]
-  (println (country-colors "FRA"))
+(defn add-initial-frames [{:keys [width
+                                  height
+                                  encoder
+                                  provinces
+                                  country-colors] :as params}
+                          ymd]
   (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
     (draw-oceans frame)
     (write-year frame ymd)
-    (doseq [province provinces]
-      (when-let [o (:initial-owner province)]
-        (render-owner province country-colors frame o)))
     ;; ????????????? REMOVING THIS BREAKS EVERYTHING    
     (doto (.createGraphics frame)
       (.setColor (Color. 2 3 4))
       (.fillRect 0 0 1 1)
       .dispose)
-    (.addFrame encoder frame)))
+    (.addFrame encoder frame))
+  (for [ps (partition-all 250 (filter :initial-owner provinces))]
+    (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
+      (draw-transparent frame)
+      (write-year frame ymd)
+      (doseq [province ps]
+        (let [o (:initial-owner province)]
+          (render-owner province country-colors frame o)))
+      ;; ????????????? REMOVING THIS BREAKS EVERYTHING    
+      (doto (.createGraphics frame)
+        (.setColor (Color. 2 3 4))
+        (.fillRect 0 0 1 1)
+        .dispose)
+      (.addFrame encoder frame))))
 
-(defn add-delta-frame [{:keys [width
-                               height
-                               encoder
-                               provinces
-                               country-colors]}
-                       start-ymd
-                       end-ymd]
-  (println "New frame::" end-ymd)
-  (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
-    (draw-transparent frame)
-    (doto (.createGraphics frame)
-      (.setColor ocean-color)
-      (.fillRect 0 0 200 100)
-      .dispose)
-    (write-year frame end-ymd)
-    (doseq [province provinces]
-      (when-let [owner (latest-new-owner province start-ymd end-ymd)]
-        (render-owner province country-colors frame owner)))
-    (.addFrame encoder frame)))
+(defn add-delta-frames [{:keys [width
+                                height
+                                encoder
+                                provinces
+                                country-colors]}
+                        start-ymd
+                        end-ymd]
+  (println "New frame:" end-ymd)
+  (let [updates (keep (fn [province]
+                        (when-let [owner (latest-new-owner province start-ymd end-ymd)]
+                          [province owner]))
+                      provinces)]
+    (println "Updates" (map (fn [[p o]] [(:name p) o]) updates))
+    (for [province-owners (partition-all 250 updates)]
+      (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
+        (draw-transparent frame)
+        (doto (.createGraphics frame)
+          (.setColor ocean-color)
+          (.fillRect 0 0 200 100)
+          .dispose)
+        (write-year frame end-ymd)
+        (doseq [[province owner] province-owners]
+          (render-owner province country-colors frame owner))
+        (.addFrame encoder frame)))))
 
 (defn base-gif [gif-filename]
   (doto (AnimatedGifEncoder.)
@@ -108,14 +121,14 @@
     (.start gif-filename)))
 
 (defn add-frames [{:keys [encoder provinces colors] :as params} start-ymd end-ymd]
-  (add-initial-frame params start-ymd)
+  (add-initial-frames params start-ymd)
   (if (= (first start-ymd) (first end-ymd))
-    (add-delta-frame params start-ymd end-ymd)
+    (add-delta-frames params start-ymd end-ymd)
     (do
-      (add-delta-frame params start-ymd [(inc (first start-ymd)) 1 1])
+      (add-delta-frames params start-ymd [(inc (first start-ymd)) 1 1])
       (doseq [year (range (inc (first start-ymd)) (first end-ymd))]
-        (add-delta-frame params [year 1 1] [(inc year) 1 1]))
-      (add-delta-frame params [(first end-ymd) 1 1] end-ymd))))
+        (add-delta-frames params [year 1 1] [(inc year) 1 1]))
+      (add-delta-frames params [(first end-ymd) 1 1] end-ymd))))
 
 (defn da-min [x y]
   (if x
