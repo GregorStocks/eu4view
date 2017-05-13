@@ -24,25 +24,30 @@
      :columns 3
      :items ["EU4 Folder" eu4-folder (button :text "Pick EU4 Folder"
                                              :listen [:action (fn [e]
-                                                                (if-let [f (choose-file :selection-mode :dirs-only)]
+                                                                (if-let [f (choose-file
+                                                                            :selection-mode :dirs-only
+                                                                            :filters [["Folders" #(.isDirectory %)]]
+                                                                            :dir (.getText eu4-folder))]
                                                                   (text! eu4-folder f)))])
              "Savegame" savegame-location (button :text "Pick Savegame"
                                                   :listen [:action (fn [e]
-                                                                     (if-let [f (choose-file)]
+                                                                     (if-let [f (choose-file :dir (.getText savegame-location))]
                                                                        (text! savegame-location f)))])
              "Scale" "1/2" ""
              "Interval" "1 year" ""
              "Frame delay" "10ms" ""
              "Output Gif Location" output-gif-location (button :text "Pick Gif Location"
                                                                :listen [:action (fn [e]
-                                                                                  (if-let [f (choose-file :selection-mode :dirs-only)]
+                                                                                  (if-let [f (choose-file :selection-mode :dirs-only
+                                                                                                          :dir "."
+                                                                                                          :filters [["Folders" #(.isDirectory %)]])]
                                                                                     (text! output-gif-location f)))])
              "" "" (button :text "DO IT"
                            :listen [:action (fn [] (println "IT IS DONE"))])])))
 
 (defn show-panel []
   (-> (frame :title "Hello"
-             :content panel
+             :content (panel)
              :on-close :exit)
       pack!
       show!))
