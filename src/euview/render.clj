@@ -7,8 +7,8 @@
             [euview.parse :as parse]
             [mikera.image.core :as image]))
 
-(defn load-map []
-  (javax.imageio.ImageIO/read (io/resource "Europa Universalis IV/map/provinces.bmp")))
+(defn load-map [eu4-folder]
+  (javax.imageio.ImageIO/read (io/file (str eu4-folder "/map/provinces.bmp"))))
 
 (def ocean-color (Color. 60 120 250))
 
@@ -143,8 +143,8 @@
         (swap! rights update c da-max x)))
     (juxt @lefts @rights @tops @bottoms)))
 
-(defn add-overlays [provinces map scale-factor]
-  (let [loaded (slurp (io/resource "Europa Universalis IV/map/definition.csv"))
+(defn add-overlays [eu4-folder provinces map scale-factor]
+  (let [loaded (slurp (io/file (str eu4-folder "/map/definition.csv")))
         lines (drop 1 (string/split-lines loaded))
         definitions (into {} (for [line lines]
                                (let [[_ pid r g b name] (re-matches #"(\d+);(\d+);(\d+);(\d+);(.*)" line)]
@@ -180,9 +180,9 @@
             (assoc p :overlay nil :overlay-x 0 :overlay-y 0)))))))
 
 (def scale-factor 2)
-(defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} gif-filename]
-  (let [map (load-map)
-        provinces (doall (add-overlays provinces map scale-factor))
+(defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} eu4-folder gif-filename]
+  (let [map (load-map eu4-folder)
+        provinces (doall (add-overlays eu4-folder provinces map scale-factor))
         encoder (base-gif gif-filename)]
     (println "Rendering gif")
     (add-frames {:encoder encoder
