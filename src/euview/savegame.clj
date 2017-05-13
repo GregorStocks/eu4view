@@ -23,15 +23,18 @@
          :initial-owner (get history "owner" default-owner)
          :owners owners}))))
 
+(def empty-color (Color. 50 50 20))
 (defn country-colors [savegame]
-  (into {:empty (Color. 50 50 20)
-         :ocean (Color. 60 120 250)
-         :wasteland (Color. 100 50 25)}
-        (for [[k v] (-> savegame :variables (get "countries"))]
-          (do
-            (let [[r g b] (map #(int %)
-                               (get (get v "colors") "map_color"))]
-              [k (Color. r g b)])))))
+  (assoc
+   (into {:empty empty-color
+          :ocean (Color. 60 120 250)
+          :wasteland (Color. 100 50 25)}
+         (for [[k v] (-> savegame :variables (get "countries"))]
+           (do
+             (let [[r g b] (map #(int %)
+                                (get (get v "colors") "map_color"))]
+               [k (Color. r g b)]))))
+   "XXX" empty-color))
 
 (defn parse-savegame [file]
   (let [parsed (parse/parse-file file)]

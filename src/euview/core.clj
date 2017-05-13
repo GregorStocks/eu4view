@@ -2,6 +2,7 @@
   (:gen-class)
   (:require [clojure.java.io :as io]
             [euview.savegame :as savegame]
+            [euview.gui :as gui]
             [euview.render :as render]))
 
 (defn zip-contents->eu4-file [c]
@@ -21,8 +22,11 @@
         savegame (savegame/parse-savegame (resource->eu4-file (io/resource filename)))]
     savegame))
 
-(defn -main
-  [& args]
+(defn run []
   (let [f (france)]
     (render/render-gif f "target/france.gif")
     (println "Rendered france.gif")))
+
+(defn -main
+  [& args]
+  (gui/show-panel))
