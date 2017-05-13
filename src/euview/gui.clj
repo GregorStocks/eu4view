@@ -8,16 +8,17 @@
 
 (defn find-eu4-folder []
   (let [candidate-paths ["/Users/gregor/code/euview/resources"
+                         "C:/Program Files (x86)/Steam/SteamApps/common/Europa Universalis IV"
                          "/Users/gregor/Library/Application Support/Steam/SteamApps/common/Europa Universalis IV"]]
     (or
      (first (filter #(.isDirectory (io/file %)) candidate-paths))
-     "C:/Program Files/EU4")))
+     "C:/Program Files/Steam/SteamApps/common/Europa Universalis IV")))
 
 (defn find-eu4-savegame []
   (let [candidate-directories ["/Users/gregor/code/euview/resources"
-                               "/Users/gregor/Documents/Paradox Interactive/Europa Universalis IV"]
+                               (str (System/getProperty "user.home") "/Documents/Paradox Interactive/Europa Universalis IV/save games")]
         directory (first (filter #(.isDirectory (io/file %)) candidate-directories))]
-    (or directory "C:/Program FIles/EU.eu4")))
+    (or directory "C:/Program Files/EU.eu4")))
 
 (defn zip-contents->eu4-file [c]
   ;; wat
@@ -38,7 +39,8 @@
                               (io/input-stream (io/file savegame-location)))))
                            (catch Exception e
                              (println e)
-                             (text! error-text (str "Error loading savegame: " e))))]
+                             (text! error-text (str "Error loading savegame: " e))
+							 nil))]
     (try
       (render/render-gif savegame eu4-folder output-gif-location)
       (text! error-text "ok i've done it")
@@ -49,7 +51,7 @@
 (defn panel []
   (let [eu4-folder (text :text (find-eu4-folder))
         savegame-location (text :text (find-eu4-savegame))
-        output-gif-location (text :text "BLEH.gif")
+        output-gif-location (text :text (str (System/getProperty "user.home") "/Desktop/eu4view.gif"))
         error-text (label)]
     (grid-panel
      :columns 3
