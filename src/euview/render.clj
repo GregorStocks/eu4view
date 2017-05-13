@@ -5,6 +5,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [euview.parse :as parse]
+            [euview.util :as util]
             [mikera.image.core :as image]))
 
 (defn load-map [eu4-folder]
@@ -26,17 +27,12 @@
     (.drawString (str ymd) 50 50)
     .dispose))
 
-(defn ymd-< [x y]
-  (neg? (compare x y)))
-(defn ymd-<= [x y]
-  (not (pos? (compare x y))))
-
 (defn latest-new-owner [province start-ymd end-ymd]
   (->> province
        :owners
        (filter #(let [x (first %)]
-                  (and (ymd-< start-ymd x)
-                       (ymd-<= x end-ymd))))
+                  (and (util/ymd-< start-ymd x)
+                       (util/ymd-<= x end-ymd))))
        (sort-by first)
        last
        second))
@@ -44,16 +40,16 @@
 (def ac (AlphaComposite/getInstance AlphaComposite/SRC_ATOP))
 (defn render-owner [province country-colors frame owner]
   (if-let [o (:overlay province)]
-    (let [owner-color (country-colors owner)
+    (let [owner-color (or (country-colors owner)
+                          (Color. 255 0 255))
           g (.createGraphics o)
           fg (.createGraphics frame)]
-      (when (not= owner-color Color/WHITE)
-        (.setComposite g ac)
-        (.setColor g owner-color)
-        (.fill g (java.awt.geom.Rectangle2D$Double. 0 0 (.getWidth o) (.getHeight o)))
-        (.dispose g)
-        (.drawImage fg o (:overlay-x province) (:overlay-y province) nil)
-        (.dispose fg)))))
+      (.setComposite g ac)
+      (.setColor g owner-color)
+      (.fill g (java.awt.geom.Rectangle2D$Double. 0 0 (.getWidth o) (.getHeight o)))
+      (.dispose g)
+      (.drawImage fg o (:overlay-x province) (:overlay-y province) nil)
+      (.dispose fg))))
 
 (defn add-initial-frames [{:keys [width
                                   height
@@ -85,7 +81,6 @@
                       provinces)]
     (doseq [province-owners (map #(apply concat %)
                                  (partition-all 250 (vals (group-by second updates))))]
-      (println "Frame for" end-ymd)
       (let [frame (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)]
         (draw-transparent frame)
         (doto (.createGraphics frame)

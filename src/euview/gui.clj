@@ -1,9 +1,10 @@
 (ns euview.gui
   (:use [seesaw.core]
-        [seesaw.chooser]
-        [clojure.java.io :as io]
-        [euview.savegame :as savegame]
-        [euview.render :as render]))
+        [seesaw.chooser])
+  (:require [clojure.java.io :as io]
+            [euview.savegame :as savegame]
+            [euview.parse :as parse]
+            [euview.render :as render]))
 
 (defn find-eu4-folder []
   (let [candidate-paths ["/Users/gregor/code/euview/resources"
@@ -31,9 +32,10 @@
 
 (defn try-rendering [eu4-folder savegame-location output-gif-location error-text]
   (text! error-text "RENDERING!!!!!!!!!!!!!!!!!!!!!!")
-  (when-let [savegame (try (savegame/parse-savegame
-                            (input-stream->eu4-file
-                             (io/input-stream (io/file savegame-location))))
+  (when-let [savegame (try (savegame/process-savegame
+                            (parse/parse-file
+                             (input-stream->eu4-file
+                              (io/input-stream (io/file savegame-location)))))
                            (catch Exception e
                              (println e)
                              (text! error-text (str "Error loading savegame: " e))))]
