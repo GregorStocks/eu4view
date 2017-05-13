@@ -1,36 +1,17 @@
+
 # euview
 
-FIXME: description
-
-## Installation
-
-Download from http://example.com/FIXME.
+makes gifs
 
 ## Usage
 
-FIXME: explanation
-
-    $ java -jar euview-0.1.0-standalone.jar [args]
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
+- install leiningen
+- lein run # runs
+- lein uberjar # builds
 
 ## License
 
-Copyright © 2017 FIXME
+Copyright © 2017 Gregor Stocks
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
