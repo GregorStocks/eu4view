@@ -1,5 +1,6 @@
 (ns euview.gui
-  (:import java.util.zip.ZipFile)
+  (:import java.util.zip.ZipFile
+           org.apache.commons.compress.archivers.zip.ZipArchiveInputStream)
   (:use [seesaw.core]
         [seesaw.chooser])
   (:require [clojure.java.io :as io]
@@ -21,25 +22,22 @@
         directory (first (filter #(.isDirectory (io/file %)) candidate-directories))]
     (or directory "C:/Program Files/EU.eu4")))
 
-(defn get-map [zip-stream]
-  (loop []
-    (let [f (.getNextEntry zip-stream)]
-      (cond
-        (= (.getName f) "provinces.bmp") (do
-                                           (println "I believe I've found it" (type zip-stream) f (slurp f))
-                                           (slurp zip-stream))
-        (not f) (throw (ex-info "Map not found" {}))
-        :else (recur)))))
+(defn get-map [input-stream]
+  (let [z (ZipArchiveInputStream. input-stream)]
+    (loop []
+      (let [f (.getNextEntry z)]
+        (cond
+          (= (.getName f) "provinces.bmp") (javax.imageio.ImageIO/read z)
+          (not f) (throw (ex-info "Map not found" {}))
+          :else (recur))))))
 
 (defn unzip-savegame [f]
   (let [z (ZipFile. f)]
     (merge
      {:savegame (slurp (.getInputStream z (.getEntry z "game.eu4")))}
      (when-let [r (.getEntry z "rnw.zip")]
-       (println "I found RNW")
-       (let [rnw (java.util.zip.ZipInputStream. (.getInputStream z r))
-             map-contents (get-map rnw)
-             map (javax.imageio.ImageIO/read map-contents)]
+       (let [rnw (.getInputStream z r)
+             map (get-map rnw)]
          (println "Neat I found a map" rnw map)
          {:map map})))))
 
