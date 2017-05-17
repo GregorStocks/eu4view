@@ -31,7 +31,8 @@
                             {ymd new-tag})))))
 
 (defn construct-provinces [savegame]
-  (let [map-file (parse/parse-file (io/resource "Europa Universalis IV/map/default.map"))
+  ;; todo load from eu4 directory not resources...... doy
+  (let [map-file (parse/parse-file (slurp (io/resource "Europa Universalis IV/map/default.map")))
         ocean-provinces (set (map - (get (:variables map-file) "sea_starts")))
         tag-changes (tag->changes savegame)]
     (for [[pid v] (-> savegame :variables (get "provinces"))]

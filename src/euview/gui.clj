@@ -1,4 +1,5 @@
 (ns euview.gui
+  (:import java.util.zip.ZipFile)
   (:use [seesaw.core]
         [seesaw.chooser])
   (:require [clojure.java.io :as io]
@@ -20,33 +21,39 @@
         directory (first (filter #(.isDirectory (io/file %)) candidate-directories))]
     (or directory "C:/Program Files/EU.eu4")))
 
-(defn zip-contents->eu4-file [c]
-  ;; wat
+(defn get-map [zip-stream]
   (loop []
-    (let [f (.getNextEntry c)]
-      (if (= (.getName f) "game.eu4")
-        c
-        (recur)))))
+    (let [f (.getNextEntry zip-stream)]
+      (cond
+        (= (.getName f) "provinces.bmp") (slurp zip-stream)
+        (not f) (throw (ex-info "Map not found" {}))
+        :else (recur)))))
 
-(defn input-stream->eu4-file [stream]
-  (zip-contents->eu4-file (java.util.zip.ZipInputStream. stream)))
+(defn unzip-savegame [f]
+  (let [z (ZipFile. f)]
+    (merge
+     {:savegame (slurp (.getInputStream z (.getEntry z "game.eu4")))}
+     (when-let [r (.getEntry z "rnw.zip")]
+       (let [rnw (java.util.zip.ZipInputStream. (.getInputStream z r))]
+         {:map (javax.imageio.ImageIO/read rnw)})))))
 
 (defn try-rendering [eu4-folder savegame-location output-gif-location error-text]
   (text! error-text "RENDERING!!!!!!!!!!!!!!!!!!!!!!")
-  (when-let [savegame (try (savegame/process-savegame
-                            (parse/parse-file
-                             (input-stream->eu4-file
-                              (io/input-stream (io/file savegame-location)))))
-                           (catch Exception e
-                             (println e)
-                             (text! error-text (str "Error loading savegame: " e))
-							 nil))]
-    (try
-      (render/render-gif savegame eu4-folder output-gif-location)
-      (text! error-text "ok i've done it")
-      (catch Exception e
-        (println e)
-        (text! error-text (str "Error rendering gif: " e))))))
+  (try
+    (let [unzipped (unzip-savegame (io/file savegame-location))]
+      (when-let [savegame (try (savegame/process-savegame
+                                (parse/parse-file (:savegame unzipped))))]
+        (try
+          (render/render-gif savegame (:map unzipped) eu4-folder output-gif-location)
+          (text! error-text "ok i've done it")
+          (catch Exception e
+            (println e)
+            (text! error-text (str "Error rendering gif: " e))
+            nil))))
+    (catch Exception e
+      (println e)
+      (text! error-text "Error loading savegame: " e)
+      nil)))
 
 (defn panel []
   (let [eu4-folder (text :text (find-eu4-folder))

@@ -47,8 +47,9 @@
                                   (if (= f :ignore)
                                     (pull-token s (+ offset (count match)))
                                     [(f match) (+ offset (count match))]))
-        (empty? successes) (throw (ex-info "Couldn't parse" {:vicinity (subs s offset (min (count s) (+ offset 50)))
-                                                             :offset offset}))
+        (empty? successes) (throw (ex-info "Couldn't lex" {:vicinity (subs s offset (min (count s) (+ offset 50)))
+                                                           :offset offset
+                                                           :size (count s)}))
         :else (throw (ex-info "Multiple matchers matched:" {:matchers successes}))))))
 
 (defn lex [s]

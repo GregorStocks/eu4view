@@ -9,13 +9,14 @@
 (defn france-savegame []
   (-> "France1739_06_08.eu4"
       io/resource
-      io/input-stream
-      gui/input-stream->eu4-file
+      io/file
+      gui/unzip-savegame
+      :savegame
       parse/parse-file
       savegame/process-savegame))
 
 (defn -main
   [& args]
   (if (= (first args) "headless")
-    (render/render-gif (france-savegame) "resources/Europa Universalis IV" "target/headless-france.gif")
+    (render/render-gif (france-savegame) nil "resources/Europa Universalis IV" "target/headless-france.gif")
     (gui/show-panel)))

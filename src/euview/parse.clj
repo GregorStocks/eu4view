@@ -69,8 +69,5 @@
           (empty? matches) (throw (ex-info "Unable to parse at" {:stack (:stack state)
                                                                  :tokens (take 10 tokens)})))))))
 
-(defn parse-file [f]
-  (-> f
-      slurp
-      lex/lex
-      parse))
+(defn parse-file [contents]
+  (parse (lex/lex contents)))

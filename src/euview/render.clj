@@ -175,11 +175,11 @@
             (assoc p :overlay nil :overlay-x 0 :overlay-y 0)))))))
 
 (def scale-factor 2)
-(defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} eu4-folder gif-filename]
-  (let [map (load-map eu4-folder)
+(defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} map-file eu4-folder gif-filename]
+  (let [map (or map-file (load-map eu4-folder))
         provinces (doall (add-overlays eu4-folder provinces map scale-factor))
         encoder (base-gif gif-filename)]
-    (println "Rendering gif")
+    (println "Rendering gif" start-ymd end-ymd (count provinces))
     (add-frames {:encoder encoder
                  :width (int (/ (.getWidth map) scale-factor))
                  :height (int (/ (.getHeight map) scale-factor))
