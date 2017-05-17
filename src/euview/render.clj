@@ -176,6 +176,7 @@
 
 (def scale-factor 2)
 (defn render-gif [{:keys [provinces start-ymd end-ymd country-colors] :as savegame} map-file eu4-folder gif-filename]
+  (println "Whats the frickin map" map-file)
   (let [map (or map-file (load-map eu4-folder))
         provinces (doall (add-overlays eu4-folder provinces map scale-factor))
         encoder (base-gif gif-filename)]

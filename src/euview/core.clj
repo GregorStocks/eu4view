@@ -7,16 +7,18 @@
             [euview.render :as render]))
 
 (defn france-savegame []
-  (-> "France1739_06_08.eu4"
+  (-> "Ottomans1649_05_19.eu4"
       io/resource
       io/file
-      gui/unzip-savegame
-      :savegame
-      parse/parse-file
-      savegame/process-savegame))
+      gui/unzip-savegame))
 
 (defn -main
   [& args]
   (if (= (first args) "headless")
-    (render/render-gif (france-savegame) nil "resources/Europa Universalis IV" "target/headless-france.gif")
+    (let [s (france-savegame)]
+      (println "What????")
+      (render/render-gif (-> s :savegame parse/parse-file savegame/process-savegame)
+                         (:map s)
+                         "resources/Europa Universalis IV"
+                         "target/headless-france.gif"))
     (gui/show-panel)))

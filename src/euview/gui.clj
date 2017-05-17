@@ -25,7 +25,9 @@
   (loop []
     (let [f (.getNextEntry zip-stream)]
       (cond
-        (= (.getName f) "provinces.bmp") (slurp zip-stream)
+        (= (.getName f) "provinces.bmp") (do
+                                           (println "I believe I've found it" (type zip-stream) f (slurp f))
+                                           (slurp zip-stream))
         (not f) (throw (ex-info "Map not found" {}))
         :else (recur)))))
 
@@ -34,8 +36,12 @@
     (merge
      {:savegame (slurp (.getInputStream z (.getEntry z "game.eu4")))}
      (when-let [r (.getEntry z "rnw.zip")]
-       (let [rnw (java.util.zip.ZipInputStream. (.getInputStream z r))]
-         {:map (javax.imageio.ImageIO/read rnw)})))))
+       (println "I found RNW")
+       (let [rnw (java.util.zip.ZipInputStream. (.getInputStream z r))
+             map-contents (get-map rnw)
+             map (javax.imageio.ImageIO/read map-contents)]
+         (println "Neat I found a map" rnw map)
+         {:map map})))))
 
 (defn try-rendering [eu4-folder savegame-location output-gif-location error-text]
   (text! error-text "RENDERING!!!!!!!!!!!!!!!!!!!!!!")
