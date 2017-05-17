@@ -1,4 +1,4 @@
-(defproject euview "1.0.0"
+(defproject euview "1.0.1"
   :description "euview"
   :url "http://buttware.com/euview"
   :license {:name "Eclipse Public License"
